@@ -1,21 +1,40 @@
+//! The `doc.md` walkthrough, ported to the hook API.
+//!
+//! ```text
+//! cargo run --example demo
+//! ```
+
 use signals::*;
 
 fn main() {
     println!("1. Create");
-    let (first, _set_first) = create_signal("John".to_string());
-    let (last, set_last) = create_signal("Smith".to_string());
-    let (show_full, set_show_full) = create_signal(true);
+    let (first, _set_first) = use_state("John".to_string());
+    let (last, set_last) = use_state("Smith".to_string());
+    let (show_full, set_show_full) = use_state(true);
 
-    let display = create_memo(move || {
-        println!("   ### executing display_name");
-        on_cleanup(|| println!("   ### releasing display_name dependencies"));
-        if !show_full.get() {
-            return first.get();
-        }
-        format!("{} {}", first.get(), last.get())
-    });
+    let display = use_memo(
+        {
+            let (first, last, show_full) = (first.clone(), last.clone(), show_full.clone());
+            move || {
+                println!("   ### executing display_name");
+                let p = |line: &str| println!("   ### {line}");
+                use_cleanup(move || p("releasing display_name dependencies"));
+                if !show_full.get() {
+                    return first.get();
+                }
+                format!("{} {}", first.get(), last.get())
+            }
+        },
+        (),
+    );
 
-    let _effect = create_effect(move || println!("My name is {}", display.get()));
+    let _effect = use_effect(
+        {
+            let display = display.clone();
+            move || println!("My name is {}", display.get())
+        },
+        (),
+    );
 
     println!("2. Set show_full: false");
     set_show_full.set(false);
