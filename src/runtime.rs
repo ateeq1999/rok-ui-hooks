@@ -614,7 +614,7 @@ fn drain(deferred: bool) {
 /// Run `f` without subscribing the current observer to anything it reads.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (a, set_a) = use_state(1);
 /// let (b, set_b) = use_state(10);
@@ -639,7 +639,7 @@ pub fn untrack<R>(f: impl FnOnce() -> R) -> R {
 /// Group writes: effects are queued and each one runs at most once per flush.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (a, set_a) = use_state(1);
 /// let (b, set_b) = use_state(2);
@@ -666,7 +666,7 @@ pub fn batch<R>(f: impl FnOnce() -> R) -> R {
 /// Run every queued effect, deferred ones included.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (a, set_a) = use_state(0);
 /// let _e = create_deferred_effect(
@@ -701,7 +701,7 @@ pub fn tick() {
 /// in an effect body — are disposed together when the root goes away.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (count, set_count) = use_state(0);
 /// let ran = std::rc::Rc::new(std::cell::Cell::new(0));
@@ -775,7 +775,7 @@ impl Drop for Root {
 /// [`Root`].
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (n, set_n) = use_state(0);
 /// let ran = std::rc::Rc::new(std::cell::Cell::new(0));

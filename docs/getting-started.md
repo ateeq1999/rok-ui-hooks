@@ -5,7 +5,7 @@ Everything here runs. The snippets are compiled as tests by `cargo test`.
 ## 1. A signal is a value that remembers who read it
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (count, set_count) = use_state(0);
 assert_eq!(count.get(), 0);
@@ -23,7 +23,7 @@ and marks whoever read the value. Nothing runs yet. That gap is what makes the
 rest of the design possible.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (name, set_name) = use_state(String::from("ada"));
 
@@ -38,7 +38,7 @@ An effect is a closure that runs now, and again whenever a signal it read
 changes. Read inside the body to subscribe — that is the whole mechanism.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (celsius, set_celsius) = use_state(20i32);
 let _watch = use_effect(
@@ -61,7 +61,7 @@ Two details matter:
 ## 3. Memos are values that recompute on demand
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (width, set_width) = use_state(3u32);
 let area = use_memo(
@@ -86,7 +86,7 @@ say so explicitly — the comparator decides whether downstream work happens at
 all.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 use std::rc::Rc;
 
 let (items, set_items) = use_state(vec![1, 2, 3]);
@@ -122,7 +122,7 @@ Allocating a fresh `Vec` every time a signal changes defeats `PartialEq`. Compar
 the contents instead:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (rows, set_rows) = use_state(vec![1, 2, 3]);
 let total = use_memo_eq(
@@ -139,7 +139,7 @@ Without ownership, an effect outlives the state it reads and the graph keeps
 growing. Every hook here belongs to the scope that created it.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (n, set_n) = use_state(0);
 let runs = std::rc::Rc::new(std::cell::Cell::new(0));
@@ -168,7 +168,7 @@ just run `examples/ownership.rs`.
 ## 5. Batching, untracking, flushing
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (a, set_a) = use_state(0);
 let (b, set_b) = use_state(0);

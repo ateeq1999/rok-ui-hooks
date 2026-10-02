@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "signals"
+name = "rok-ui-hooks"
 version = "0.2.0"

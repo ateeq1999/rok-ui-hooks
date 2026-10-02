@@ -6,7 +6,7 @@
 //! adding state never costs a re-render.
 //!
 //! ```
-//! use signals::*;
+//! use rok_ui_hooks::*;
 //!
 //! let (count, set_count) = use_state(0);
 //! let doubled = use_memo(

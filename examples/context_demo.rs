@@ -4,7 +4,7 @@
 //! cargo run --example context_demo
 //! ```
 
-use signals::*;
+use rok_ui_hooks::*;
 
 #[derive(Clone)]
 enum Theme {

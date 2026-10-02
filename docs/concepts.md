@@ -37,7 +37,7 @@ You do not call `subscribe`. Reading a signal while a computation is running is
 what records the edge:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (a, set_a) = use_state(1);
 let (b, set_b) = use_state(10);
@@ -57,7 +57,7 @@ what it is subscribed to. Take a branch and the dependency disappears; take
 another and it appears.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (toggle, set_toggle) = use_state(false);
 let (name, set_name) = use_state(String::from("ada"));
@@ -99,7 +99,7 @@ effect runs, so the effect reads a consistent graph — no intermediate state, n
 glitch.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (a, set_a) = use_state(1);
 let doubled = use_memo(
@@ -136,7 +136,7 @@ hanging.
 ## `untrack` reads without subscribing
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (a, set_a) = use_state(1);
 let (b, set_b) = use_state(2);
@@ -162,7 +162,7 @@ A computation that is never disposed is a leak with extra steps. Every hook here
 is owned by the scope that created it:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (n, set_n) = use_state(0);
 let runs = std::rc::Rc::new(std::cell::Cell::new(0));
@@ -192,7 +192,7 @@ a re-run disposes the previous generation before building the next. No zombies,
 no "the old subscriber is still in the graph".
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (label, set_label) = use_state("a".to_string());
 let runs = use_ref(0);
@@ -237,7 +237,7 @@ The `deps` argument exists for the React muscle memory and for a real reason: an
 effect should not re-run because something it never looked at changed.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (a, set_a) = use_state(1);
 let (b, set_b) = use_state(10);
@@ -270,7 +270,7 @@ queue is otherwise quiet — useful for work that must not interleave with the
 render pass, like persisting state after a burst of edits.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (name, set_name) = use_state(String::from("ada"));
 let order = use_ref(Vec::new());

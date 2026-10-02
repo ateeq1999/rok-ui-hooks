@@ -7,7 +7,7 @@
 //! There is no background thread: everything runs when you call [`tick`], so
 //! nothing here needs `Send` and nothing can mutate the graph off-thread.
 
-use signals::*;
+use rok_ui_hooks::*;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;

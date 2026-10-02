@@ -1,11 +1,14 @@
 [package]
-name = "signals"
+name = "rok-ui-hooks"
 version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Fine-grained reactivity for Rust with a React-flavoured API: signals, effects, memos, context, stores, ownership and async resources."
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+repository = "https://github.com/ateeq1999/rok-ui-hooks"
+documentation = "https://docs.rs/rok-ui-hooks"
+homepage = "https://github.com/ateeq1999/rok-ui-hooks"
 keywords = ["reactivity", "signals", "state", "hooks", "reactive"]
 categories = ["gui", "web-programming", "asynchronous"]
 [dependencies]
@@ -20,5 +23,5 @@ all = "warn"
 missing_safety_doc = "warn"
 
 [[bench]]
-name = "signals_bench"
+name = "rok_ui_hooks_bench"
 harness = false

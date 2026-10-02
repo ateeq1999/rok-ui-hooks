@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use signals::*;
+use rok_ui_hooks::*;
 
 // ───────────────────────────── create_root ─────────────────────────────
 

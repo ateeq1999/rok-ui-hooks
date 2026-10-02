@@ -18,7 +18,7 @@ Every public item, grouped by what it is for. Every example here is compiled by
 | `WriteSignal::get_untracked()` | read the other half (untracked) |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (count, set_count) = use_state(vec![1, 2, 3]);
 assert_eq!(count.get(), vec![1, 2, 3]);
@@ -46,7 +46,7 @@ assert_eq!(doubled, 8);
 | `Memo::dispose()` | drop the memo and every edge to it |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (n, set_n) = use_state(1);
 let squared = use_memo({ let n = n.clone(); move || n.get() * n.get() }, ());
@@ -81,7 +81,7 @@ assert_eq!(squared.peek(), 16, "still the same value");
 | `Effect::dispose()` / `Effect::leak()` / `Effect::is_alive()` | control the effect's life |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (n, set_n) = use_state(0);
 let lines = use_ref(Vec::new());
@@ -109,7 +109,7 @@ assert_eq!(*lines.borrow(), [0, 1, 2, 999]);
 | [`OwnedRoot::run(f)`] / [`OwnedRoot::dispose()`] | reuse or tear it down |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (n, set_n) = use_state(0);
 let runs = use_ref(0);
@@ -140,7 +140,7 @@ assert_eq!(*runs.borrow(), 2);
 | [`untrack(f)`] | read without subscribing |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (a, set_a) = use_state(0);
 let (b, set_b) = use_state(0);
@@ -168,7 +168,7 @@ assert_eq!(untrack(|| a.get() + b.get()), 2);
 | [`use_ref(v)`] | `Rc<RefCell<T>>` |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (query, set_query) = use_state(String::from("a"));
 let previous = use_previous(&query);
@@ -195,7 +195,7 @@ assert_eq!(debounced.get(), "b");
 | `ResourceState::is_loading()` / `is_idle()` / `value()` / `error()` / `map(f)` | helpers |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let user = use_resource(|| async { 7 });
 assert!(user.peek().is_loading());
@@ -230,7 +230,7 @@ See [`async-and-time.md`](async-and-time.md).
 | [`use_store(&store, selector)`] | one call for "read a projection now" |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 #[derive(Clone)]
 struct User { name: String, email: String }
@@ -258,7 +258,7 @@ assert_eq!(use_store(&store, |user| user.email.clone()), "grace@example.com");
 | `Context::get()` / `set(value)` | read or replace outside a provider |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let theme = create_context(String::from("light"));
 let (seen, set_seen) = use_state(String::new());
@@ -288,7 +288,7 @@ assert_eq!(use_context(&theme), "light");
 | `KeyedList::get(&key)` / `keys()` / `len()` / `is_empty()` | inspection |
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let list = create_keyed_list(
     vec![(1, "one"), (2, "two")],
@@ -308,7 +308,7 @@ assert_eq!(list.keys(), [2, 1]);
 empty for "everything I read".
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (a, set_a) = use_state(0);
 let (b, set_b) = use_state(0);

@@ -7,7 +7,7 @@ code written against React or Solid.
 
 The vocabulary maps one to one. The differences are all about ownership.
 
-| React | signals | note |
+| React | rok-ui-hooks | note |
 |-------|---------|------|
 | `useState(0)` | `use_state(0)` | returns a **pair**, not a setter closure |
 | `setX(v)` | `set_x.set(v)` | the write half is a value, not a function |
@@ -26,7 +26,7 @@ Two mechanical rules cover most ports:
 1. **A signal handle is not `Copy`.** Clone it into a closure:
 
    ```rust
-   use signals::*;
+   use rok_ui_hooks::*;
 
    let (count, set_count) = use_state(0);
    // React: useEffect(() => console.log(count), [count]);
@@ -48,7 +48,7 @@ nothing to reconcile.
 
 Solid is a closer fit, because it is also fine-grained.
 
-| Solid | signals | note |
+| Solid | rok-ui-hooks | note |
 |-------|---------|------|
 | `createSignal(v)` | `use_state(v)` | |
 | `untrack(fn)` | `untrack(fn)` | identical |
@@ -80,7 +80,7 @@ scope is disposed. Code that relied on "drop the handle to stop it" should own i
 in a scope instead:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 // Before: dropping the handle stopped the effect.
 // Now: the scope owns it.
@@ -130,7 +130,7 @@ allocated collection, it now never bails out — pass `shallow_vec_eq` or a
 comparator:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let store = create_store(vec![1, 2, 3]);
 let rows = use_memo_eq(

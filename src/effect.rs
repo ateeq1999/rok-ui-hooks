@@ -55,7 +55,7 @@ fn spawn_effect(f: impl FnMut() + 'static, deps: impl Deps + 'static, mode: Mode
 /// The returned `Effect` must be kept alive — bind it to `_e`.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (count, set_count) = use_state(0);
 /// let _e = use_effect(
@@ -79,7 +79,7 @@ pub fn create_effect(f: impl FnMut() + 'static, deps: impl Deps + 'static) -> Ef
 /// ask the runtime to paint. Pair it with [`crate::tick`] in a UI loop.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (n, set_n) = use_state(0);
 /// let _e = create_deferred_effect(
@@ -134,7 +134,7 @@ pub fn create_render_effect<C: FnOnce() + 'static>(
 /// running. It fires before that computation re-runs and when it is disposed.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (n, set_n) = use_state(0);
 /// let _e = use_effect(
@@ -154,7 +154,7 @@ pub fn use_cleanup(f: impl FnOnce() + 'static) {
 /// something you do not want to be a dependency.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (n, set_n) = use_state(0);
 /// let runs = use_ref(0);

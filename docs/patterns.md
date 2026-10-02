@@ -21,7 +21,7 @@ set_with_tax.set(price.get() * 120 / 100); // …and now remember to do this
 One fact, one derivation:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (price, set_price) = use_state(100);
 let with_tax = use_memo(
@@ -38,7 +38,7 @@ When transitions have rules ("increment", "toggle", "submit"), one pure function
 beats a `match` scattered across event handlers — and it is trivially testable.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 #[derive(Clone, Debug, PartialEq)]
 enum Action {
@@ -68,7 +68,7 @@ assert_eq!(count.get(), 9);
 ## `use_previous` for diffing
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (query, set_query) = use_state(String::new());
 let previous = use_previous(&query);
@@ -104,7 +104,7 @@ list that works and a list that resets its first row's scroll position on every
 insert.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let list = create_keyed_list(
     vec![1, 2, 3],
@@ -143,7 +143,7 @@ Rules of thumb:
 ## Context for what crosses a boundary
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let user = create_context(String::from("anonymous"));
 let (shown, set_shown) = use_state(String::new());
@@ -165,7 +165,7 @@ A `Store` is a plain value with explicit listeners. Reach for it at the boundary
 of a module that should not care *who* is watching.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let store = create_store(vec![1, 2, 3]);
 let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
@@ -192,7 +192,7 @@ The most common surprise: a closure that captured a signal by reference does not
 compile (`'static`), and a `ReadSignal` is not `Copy`.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (n, set_n) = use_state(0);
 let sink = use_ref(0);
@@ -214,7 +214,7 @@ hang and panics with a message instead — but the fix is structural: derive the
 value, or write to a signal the effect never reads.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 // Fine: the effect reads `a` and writes `b`, which it never reads.
 let (a, set_a) = use_state(0);
@@ -271,7 +271,7 @@ It does not. Nothing in this crate runs without a `tick()`. In a test, that mean
 an effect. Do not hold a borrow across a signal write:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let items = use_ref(Vec::<i32>::new());
 let (version, set_version) = use_state(0);
@@ -292,7 +292,7 @@ The graph is thread-local, so each test gets its own — no shared state, no
 `#[serial]`, run tests in parallel for free.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 #[test]
 fn a_write_settles_in_one_run() {

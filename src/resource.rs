@@ -133,7 +133,7 @@ impl<T> Drop for Resource<T> {
 /// `createResource(fetcher)` → a [`Resource`] that starts fetching immediately.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 /// use std::future::Future;
 /// use std::pin::Pin;
 /// use std::task::{Context, Poll};
@@ -208,7 +208,7 @@ where
 /// projected value lands in the resource.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 /// use std::future::Future;
 /// use std::pin::Pin;
 /// use std::task::{Context, Poll};

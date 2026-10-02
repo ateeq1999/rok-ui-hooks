@@ -82,7 +82,7 @@ pub fn create_signal<T: 'static>(initial: T) -> (ReadSignal<T>, WriteSignal<T>) 
 /// `useState(initial)` → `(state, set_state)`.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (count, set_count) = use_state(0);
 /// let _e = use_effect(

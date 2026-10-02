@@ -153,7 +153,7 @@ impl<T: PartialEq + Clone + 'static, K: Ord + Clone + 'static, N: 'static> Keyed
 /// Build a keyed list. Rows render once; use [`KeyedList::reconcile`] to diff.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let list = create_keyed_list(vec![1, 2, 3], |item: &i32| *item, |item: &i32| {
 ///     println!("row {item}");

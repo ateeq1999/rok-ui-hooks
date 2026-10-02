@@ -18,7 +18,7 @@ type Reducer<S, A> = dyn Fn(&S, A) -> S;
 /// (and to test) than scattered `set_state` calls.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// #[derive(Clone, PartialEq, Debug)]
 /// enum Action { Inc, Dec }
@@ -79,7 +79,7 @@ where
 /// Read it from inside an effect: that read is what advances the history.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (n, set_n) = use_state(1);
 /// let previous = use_previous(&n);
@@ -279,7 +279,7 @@ pub fn use_throttled<T: Clone + 'static>(source: &ReadSignal<T>, window: Duratio
 /// needs: [`crate::create_keyed_list`] uses it to own one subtree per key.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (n, set_n) = use_state(0);
 /// let ran = std::rc::Rc::new(std::cell::Cell::new(0));

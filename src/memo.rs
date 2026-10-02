@@ -67,7 +67,7 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Memo<T> {
 /// value differs.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (first, set_first) = use_state("John".to_string());
 /// let (last, _) = use_state("Smith".to_string());
@@ -97,7 +97,7 @@ pub fn use_memo<T: PartialEq + 'static>(
 /// comparator — see [`shallow_vec_eq`].
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (n, set_n) = use_state(2);
 /// let doubled = use_memo_eq(

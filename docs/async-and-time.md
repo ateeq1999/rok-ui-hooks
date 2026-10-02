@@ -16,7 +16,7 @@ effects only). In a UI, that is once per frame. In a terminal program, that is a
 loop you control:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 use std::time::Duration;
 
 let (count, set_count) = use_state(0);
@@ -59,7 +59,7 @@ cannot overwrite a newer one, and a fetch whose scope was disposed writes
 nothing.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let user = use_resource(|| async { "ada" });
 assert!(user.peek().is_loading(), "the fetch has not been polled yet");
@@ -71,7 +71,7 @@ assert_eq!(user.get(), ResourceState::Ready("ada"));
 Read `state()` inside an effect to render it:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let user = use_resource(|| async { 42 });
 let label = use_ref(String::new());
@@ -99,7 +99,7 @@ assert_eq!(*label.borrow(), "42");
 ### Cancelling and refetching
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 // A disposed scope cancels the fetch: the sink is dropped with the scope.
 {
@@ -137,7 +137,7 @@ assert!(matches!(profile.peek(), ResourceState::Ready(1)));
 you select:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 struct Response { id: u32, body: String }
 
@@ -155,7 +155,7 @@ There is no hidden `key` argument; the idiomatic way is an effect that refetches
 when the input changes:
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (id, set_id) = use_state(1u32);
 let body = use_resource(|| async { "first" });
@@ -181,7 +181,7 @@ assert!(matches!(body.peek(), ResourceState::Ready("first")));
 `spawn` registers a future with the local executor.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (status, set_status) = use_state(String::from("idle"));
 let task = spawn({
@@ -209,7 +209,7 @@ for real I/O simply resumes on the next `tick()` that finds it woken.
   nothing.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let polls = std::rc::Rc::new(std::cell::Cell::new(0));
 
@@ -252,7 +252,7 @@ deadline, and `tick()` runs the callback when the deadline passes.
 ### Debounce: the trailing edge
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 use std::time::Duration;
 
 let (text, set_text) = use_state(String::from(""));
@@ -277,7 +277,7 @@ assert_eq!(settled.get(), "hello", "only the last write survives");
 ### Throttle: leading edge plus a trailing update
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 use std::time::Duration;
 
 let (n, set_n) = use_state(0u32);
@@ -305,7 +305,7 @@ a debounced value can be passed down the tree like any other signal.
 ## Building a frame loop
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 use std::time::{Duration, Instant};
 
 let (open, set_open) = use_state(true);

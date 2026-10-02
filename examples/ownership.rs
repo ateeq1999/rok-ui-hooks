@@ -4,7 +4,7 @@
 //! cargo run --example ownership
 //! ```
 
-use signals::*;
+use rok_ui_hooks::*;
 
 fn main() {
     println!("1. A scope owns what is created inside it");

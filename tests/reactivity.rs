@@ -9,7 +9,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use common::log;
-use signals::*;
+use rok_ui_hooks::*;
 
 // ───────────────────────────── state ─────────────────────────────
 

@@ -1,17 +1,17 @@
-# signals
+# rok-ui-hooks
 
 Fine-grained reactivity for Rust with a React-flavoured API.
 
 ```toml
 [dependencies]
-signals = "0.2"
+rok-ui-hooks = "0.2"
 ```
 
 No dependencies, no `unsafe`, no build script, no runtime. One rule: a value is
 read inside a computation, and that computation is told when the value changes.
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 let (count, set_count) = use_state(0);
 
@@ -41,7 +41,7 @@ consistent snapshot, no matter what order the writes arrived in.
 ## A tour in four hooks
 
 ```rust
-use signals::*;
+use rok_ui_hooks::*;
 
 // 1. State.
 let (name, set_name) = use_state(String::from("world"));

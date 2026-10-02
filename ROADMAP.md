@@ -19,7 +19,7 @@ terminal program. Planned:
 
 - An optional background driver that wakes the thread owning the graph when a
   deadline passes or a future becomes ready.
-- `tick(Duration)` and a `Scheduler` that owns the queue, so `signals` can drive
+- `tick(Duration)` and a `Scheduler` that owns the queue, so `rok-ui-hooks` can drive
   a blocking program without the caller writing a loop.
 - Timer precision that does not depend on the caller polling.
 

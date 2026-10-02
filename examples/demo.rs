@@ -6,7 +6,7 @@
 //!
 //! `docs/getting-started.md` covers the same ground in prose.
 
-use signals::*;
+use rok_ui_hooks::*;
 
 fn main() {
     println!("1. Create");

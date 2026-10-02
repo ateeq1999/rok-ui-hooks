@@ -114,7 +114,7 @@ impl Drop for Task {
 /// Outside a scope, dropping the handle cancels.
 ///
 /// ```
-/// use signals::*;
+/// use rok_ui_hooks::*;
 ///
 /// let (text, set_text) = use_state(String::new());
 /// let signal = set_text.clone();

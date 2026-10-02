@@ -3,7 +3,7 @@
 mod common;
 
 use common::log;
-use signals::*;
+use rok_ui_hooks::*;
 
 #[test]
 fn reads_default_without_a_provider() {

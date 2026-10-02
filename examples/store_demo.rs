@@ -5,7 +5,7 @@
 //! cargo run --example store_demo
 //! ```
 
-use signals::*;
+use rok_ui_hooks::*;
 
 #[derive(Clone)]
 struct Cart {

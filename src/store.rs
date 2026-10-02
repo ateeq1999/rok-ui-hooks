@@ -2,7 +2,7 @@
 //! hooks.
 //!
 //! ```
-//! use signals::*;
+//! use rok_ui_hooks::*;
 //!
 //! #[derive(Clone, PartialEq)]
 //! struct App { count: i32 }
@@ -161,7 +161,7 @@ impl<T: 'static> Store<T> {
     /// the slice it selected actually differs.
     ///
     /// ```
-    /// use signals::*;
+    /// use rok_ui_hooks::*;
     ///
     /// #[derive(Clone, PartialEq)]
     /// struct App { count: i32, name: String }

@@ -6,7 +6,7 @@
 
 use std::time::{Duration, Instant};
 
-use signals::*;
+use rok_ui_hooks::*;
 
 const ROUNDS: u32 = 20_000;
 

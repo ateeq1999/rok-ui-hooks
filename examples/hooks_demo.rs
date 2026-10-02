@@ -7,7 +7,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use signals::*;
+use rok_ui_hooks::*;
 
 fn main() {
     state_like_use_state();

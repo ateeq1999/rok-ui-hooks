@@ -4,7 +4,7 @@
 //! cargo run --example keyed_list
 //! ```
 
-use signals::*;
+use rok_ui_hooks::*;
 
 #[derive(Clone, PartialEq, Debug)]
 struct Task {

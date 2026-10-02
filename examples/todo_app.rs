@@ -6,7 +6,7 @@
 //! cargo run --example todo_app
 //! ```
 
-use signals::*;
+use rok_ui_hooks::*;
 
 #[derive(Clone, PartialEq)]
 struct Todo {

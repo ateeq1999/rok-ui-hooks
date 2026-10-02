@@ -6,7 +6,7 @@
 mod common;
 
 use common::log;
-use signals::*;
+use rok_ui_hooks::*;
 
 #[derive(Clone, Debug, PartialEq)]
 struct App {
