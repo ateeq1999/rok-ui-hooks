@@ -1,8 +1,10 @@
-//! The `doc.md` walkthrough, ported to the hook API.
+//! State, memos, effects and cleanup, printed step by step.
 //!
 //! ```text
 //! cargo run --example demo
 //! ```
+//!
+//! `docs/getting-started.md` covers the same ground in prose.
 
 use signals::*;
 

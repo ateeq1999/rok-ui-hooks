@@ -1,6 +1,24 @@
 [package]
 name = "signals"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-
+rust-version = "1.85"
+description = "Fine-grained reactivity for Rust with a React-flavoured API: signals, effects, memos, context, stores, ownership and async resources."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["reactivity", "signals", "state", "hooks", "reactive"]
+categories = ["gui", "web-programming", "asynchronous"]
 [dependencies]
+
+[lints.rust]
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
+missing_safety_doc = "warn"
+
+[[bench]]
+name = "signals_bench"
+harness = false

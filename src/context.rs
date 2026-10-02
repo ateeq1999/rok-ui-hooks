@@ -84,6 +84,12 @@ impl<T: Clone + 'static> Context<T> {
     }
 }
 
+impl<T: std::fmt::Debug> std::fmt::Debug for Context<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Context").field("id", &self.id).finish()
+    }
+}
+
 /// `<Ctx.Provider value={value}>` — push a value for the dynamic extent of `f`.
 pub fn with_provider<T: 'static, R>(ctx: &Context<T>, value: T, f: impl FnOnce() -> R) -> R {
     struct PopGuard;

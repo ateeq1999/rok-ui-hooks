@@ -1,96 +1,96 @@
-//! Signals — the state primitive, exposed as `use_state`.
+//! Signals — the state primitive, exposed as `use_state` / `create_signal`.
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
-use crate::runtime::{Computation, ComputationId, Source, batch, current_observer};
+use crate::runtime::{Node, notify};
 
-pub(crate) struct SignalInner<T> {
+/// The stored value. Kept apart from the [`Node`] so handles stay typed: the
+/// graph is type-erased, the data is not.
+pub(crate) struct ValueCell<T> {
     pub(crate) value: RefCell<T>,
-    /// Ordered by id so effects re-run in creation order (deterministic).
-    subscribers: RefCell<BTreeMap<ComputationId, Weak<Computation>>>,
 }
 
-impl<T> Source for SignalInner<T> {
-    fn unsubscribe(&self, id: ComputationId) {
-        self.subscribers.borrow_mut().remove(&id);
-    }
-}
-
-impl<T: 'static> SignalInner<T> {
-    /// Link the current observer to this signal — both ways.
-    fn track(self: &Rc<Self>) {
-        if let Some(running) = current_observer() {
-            let newly_added = self
-                .subscribers
-                .borrow_mut()
-                .insert(running.id, Rc::downgrade(&running))
-                .is_none();
-            if newly_added {
-                running
-                    .sources
-                    .borrow_mut()
-                    .push(self.clone() as Rc<dyn Source>);
-            }
+impl<T> ValueCell<T> {
+    pub(crate) fn new(value: T) -> Self {
+        ValueCell {
+            value: RefCell::new(value),
         }
-    }
-
-    /// Notify subscribers inside a transaction. Snapshot first: running a
-    /// subscriber mutates the subscriber list.
-    pub(crate) fn notify(&self) {
-        let subs: Vec<Rc<Computation>> = {
-            let mut map = self.subscribers.borrow_mut();
-            map.retain(|_, w| w.strong_count() > 0);
-            map.values().filter_map(Weak::upgrade).collect()
-        };
-        batch(|| {
-            for sub in subs {
-                sub.schedule();
-            }
-        });
     }
 }
 
 /// The read half of a signal — you cannot write through it.
 pub struct ReadSignal<T> {
-    pub(crate) inner: Rc<SignalInner<T>>,
+    node: Rc<Node>,
+    cell: Rc<ValueCell<T>>,
 }
 
 /// The write half of a signal — you cannot read a tracked value through it.
 pub struct WriteSignal<T> {
-    pub(crate) inner: Rc<SignalInner<T>>,
+    node: Rc<Node>,
+    cell: Rc<ValueCell<T>>,
 }
 
 impl<T> Clone for ReadSignal<T> {
     fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone(),
-        }
-    }
-}
-impl<T> Clone for WriteSignal<T> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
+            node: self.node.clone(),
+            cell: self.cell.clone(),
         }
     }
 }
 
-pub(crate) fn create_signal<T: 'static>(value: T) -> (ReadSignal<T>, WriteSignal<T>) {
-    let inner = Rc::new(SignalInner {
-        value: RefCell::new(value),
-        subscribers: RefCell::new(BTreeMap::new()),
-    });
+impl<T> Clone for WriteSignal<T> {
+    fn clone(&self) -> Self {
+        Self {
+            node: self.node.clone(),
+            cell: self.cell.clone(),
+        }
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for ReadSignal<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReadSignal")
+            .field("id", &self.node.id)
+            .field("value", &*self.cell.value.borrow())
+            .finish()
+    }
+}
+
+impl<T> std::fmt::Debug for WriteSignal<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WriteSignal")
+            .field("id", &self.node.id)
+            .finish()
+    }
+}
+
+/// `createSignal(v)` → `(read, write)`.
+pub fn create_signal<T: 'static>(initial: T) -> (ReadSignal<T>, WriteSignal<T>) {
+    let node = Node::create(false);
+    let cell = Rc::new(ValueCell::new(initial));
     (
         ReadSignal {
-            inner: inner.clone(),
+            node: node.clone(),
+            cell: cell.clone(),
         },
-        WriteSignal { inner },
+        WriteSignal { node, cell },
     )
 }
 
 /// `useState(initial)` → `(state, set_state)`.
+///
+/// ```
+/// use signals::*;
+///
+/// let (count, set_count) = use_state(0);
+/// let _e = use_effect(
+///     { let count = count.clone(); move || println!("{}", count.get()) },
+///     (),
+/// );
+/// set_count.set(1);
+/// ```
 pub fn use_state<T: 'static>(initial: T) -> (ReadSignal<T>, WriteSignal<T>) {
     create_signal(initial)
 }
@@ -98,8 +98,8 @@ pub fn use_state<T: 'static>(initial: T) -> (ReadSignal<T>, WriteSignal<T>) {
 impl<T: 'static> ReadSignal<T> {
     /// Tracked read by reference (no clone needed).
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        self.inner.track();
-        f(&self.inner.value.borrow())
+        Node::track(&self.node);
+        f(&self.cell.value.borrow())
     }
 
     /// Tracked read that clones the value.
@@ -112,36 +112,46 @@ impl<T: 'static> ReadSignal<T> {
 
     /// Read without subscribing the current observer.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        f(&self.inner.value.borrow())
+        f(&self.cell.value.borrow())
     }
 
+    /// Read without subscribing the current observer.
     pub fn get_untracked(&self) -> T
     where
         T: Clone,
     {
         self.with_untracked(T::clone)
     }
+
+    /// Alias of [`ReadSignal::get_untracked`], to pair with [`Memo::peek`](crate::Memo::peek).
+    pub fn peek(&self) -> T
+    where
+        T: Clone,
+    {
+        self.get_untracked()
+    }
 }
 
 impl<T: 'static> WriteSignal<T> {
-    /// Replace the value and notify. The value borrow is released before
-    /// notifying, so effects can read the new value.
+    /// Replace the value and notify. The borrow is released before notifying,
+    /// so effects can read the new value.
     pub fn set(&self, value: T) {
-        self.inner.write(value);
-        self.inner.notify();
+        self.replace(value);
+        notify(&self.node);
     }
 
-    /// Mutate in place (great for `Vec` / `HashMap` signals).
+    /// Mutate in place (handy for `Vec` / `HashMap` signals).
     pub fn update(&self, f: impl FnOnce(&mut T)) {
-        f(&mut self.inner.value.borrow_mut());
-        self.inner.notify();
+        f(&mut *self.cell.value.borrow_mut());
+        notify(&self.node);
     }
-}
 
-impl<T: 'static> SignalInner<T> {
-    /// Assign without notifying — used by the store, which fires its own
-    /// subscribers (plain listeners) first.
-    pub(crate) fn write(&self, value: T) -> T {
-        std::mem::replace(&mut *self.value.borrow_mut(), value)
+    /// Write the value without notifying, returning the previous one.
+    pub(crate) fn replace(&self, value: T) -> T {
+        std::mem::replace(&mut *self.cell.value.borrow_mut(), value)
+    }
+
+    pub(crate) fn node(&self) -> &Rc<Node> {
+        &self.node
     }
 }

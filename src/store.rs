@@ -1,4 +1,4 @@
-//! A Zustand-style store: state outside the component tree, subscribed to by
+//! A Zustand-style store: state outside any component tree, subscribed to by
 //! hooks.
 //!
 //! ```
@@ -29,12 +29,13 @@ use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use crate::memo::{Memo, use_memo};
+use crate::memo::{Memo, use_memo, use_memo_eq};
+use crate::runtime::notify;
 use crate::signal::{ReadSignal, WriteSignal, create_signal};
 
 type Listener<T> = Box<dyn FnMut(&T, &T)>;
 
-/// A reactive state container: readable/writable like a signal, observable by
+/// A reactive state container: readable and writable like a signal, observable by
 /// plain listeners, and selectable with [`Store::select`].
 pub struct Store<T> {
     read: ReadSignal<T>,
@@ -54,10 +55,25 @@ impl<T> Clone for Store<T> {
     }
 }
 
+impl<T: std::fmt::Debug + 'static> std::fmt::Debug for Store<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = self.read.with_untracked(|value| format!("{value:?}"));
+        f.debug_struct("Store").field("value", &value).finish()
+    }
+}
+
 /// Handle returned by [`Store::subscribe`]; dropping it unsubscribes.
 pub struct Subscription<T> {
     listeners: Rc<RefCell<BTreeMap<u64, Listener<T>>>>,
     id: u64,
+}
+
+impl<T> std::fmt::Debug for Subscription<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Subscription")
+            .field("id", &self.id)
+            .finish()
+    }
 }
 
 impl<T> Drop for Subscription<T> {
@@ -86,6 +102,7 @@ impl<T: 'static> Store<T> {
         self.read.get()
     }
 
+    /// Tracked read by reference.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.read.with(f)
     }
@@ -95,26 +112,36 @@ impl<T: 'static> Store<T> {
         self.read.with_untracked(f)
     }
 
-    /// `setState(value)` — replace, notify listeners, then notify reactions.
+    /// An untracked read, cloned.
+    pub fn peek(&self) -> T
+    where
+        T: Clone,
+    {
+        self.read.get_untracked()
+    }
+
+    /// `setState(value)` — replace, fire the listeners, then notify reactions.
     pub fn set(&self, value: T) {
-        let prev = self.write.inner.write(value);
+        let prev = self.write.replace(value);
         self.fire(&prev);
-        self.write.inner.notify();
+        notify(self.write.node());
     }
 
     /// `setState(prev => next)` — mutate in place. Requires `T: Clone` so the
-    /// previous state can be handed to listeners.
+    /// previous state can be handed to the listeners.
     pub fn update(&self, f: impl FnOnce(&mut T))
     where
         T: Clone,
     {
         let prev = self.read.get_untracked();
-        self.write.update(|value| f(value));
+        self.write.update(f);
         self.fire(&prev);
     }
 
     /// `store.subscribe(listener)` — a plain callback on every change,
     /// independent of any effect. Returns a handle that unsubscribes on drop.
+    ///
+    /// The listener receives `(new, old)`.
     ///
     /// Listeners run while the new value is borrowed: do not call `set`/`update`
     /// on the same store from inside a listener.
@@ -129,14 +156,36 @@ impl<T: 'static> Store<T> {
     }
 
     /// `createSelector(store, selector)` — a memo over a slice of the store.
-    /// Put the returned handle in a deps tuple to get Zustand's bail-out: the
-    /// reader only re-runs when this slice actually changes.
-    pub fn select<U: PartialEq + 'static>(&self, selector: impl Fn(&T) -> U + 'static) -> Memo<U>
-    where
-        T: Clone,
-    {
+    ///
+    /// The selector runs at most once per change, and the memo only notifies when
+    /// the slice it selected actually differs.
+    ///
+    /// ```
+    /// use signals::*;
+    ///
+    /// #[derive(Clone, PartialEq)]
+    /// struct App { count: i32, name: String }
+    ///
+    /// let store = create_store(App { count: 0, name: "Ada".into() });
+    /// let name = store.select(|s: &App| s.name.clone());
+    ///
+    /// store.update(|s| s.count += 1); // the selector re-runs, the value does not change
+    /// assert_eq!(name.get(), "Ada");
+    /// ```
+    pub fn select<U: PartialEq + 'static>(&self, selector: impl Fn(&T) -> U + 'static) -> Memo<U> {
         let store = self.clone();
         use_memo(move || store.with(|s| selector(s)), ())
+    }
+
+    /// [`Store::select`] with a custom equality test — Zustand's `useShallow`,
+    /// and the way to bail out of a selector whose `PartialEq` is too strict.
+    pub fn select_with_eq<U: 'static>(
+        &self,
+        selector: impl Fn(&T) -> U + 'static,
+        eq: impl Fn(&U, &U) -> bool + 'static,
+    ) -> Memo<U> {
+        let store = self.clone();
+        use_memo_eq(move || store.with(|s| selector(s)), (), eq)
     }
 
     fn fire(&self, prev: &T) {
@@ -151,8 +200,8 @@ impl<T: 'static> Store<T> {
     }
 }
 
-/// `useStore(store, selector)` — a tracked selector read. Use it inside an
-/// effect (or any observer) and the observer re-runs whenever the store changes.
+/// `useStore(store, selector)` — a tracked selector read. Use it inside an effect
+/// (or any observer) and the observer re-runs whenever the store changes.
 pub fn use_store<T: 'static, U>(store: &Store<T>, selector: impl FnOnce(&T) -> U) -> U {
     store.with(selector)
 }
