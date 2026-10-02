@@ -1,6 +1,6 @@
 [package]
 name = "rok-ui-hooks"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Fine-grained reactivity for Rust with a React-flavoured API: signals, effects, memos, context, stores, ownership and async resources."
@@ -11,6 +11,32 @@ documentation = "https://docs.rs/rok-ui-hooks"
 homepage = "https://github.com/ateeq1999/rok-ui-hooks"
 keywords = ["reactivity", "signals", "state", "hooks", "reactive"]
 categories = ["gui", "web-programming", "asynchronous"]
+
+[features]
+# Every optional feature is on by default, so a plain `rok-ui-hooks = "0.3"`
+# gets the whole surface. `default` is just the `full` alias, spelled out so
+# docs.rs shows the default set without a second lookup.
+default = ["full"]
+
+# Everything below, in one name. Useful after turning `default` off.
+full = ["store", "context", "keyed", "async", "timers"]
+
+# Zustand-style stores and selectors: `create_store`, `Store`, `use_store`.
+store = []
+
+# Scoped values with provider propagation: `create_context`, `use_context`,
+# `with_provider`.
+context = []
+
+# Keyed lists with one owned scope per row: `create_keyed_list`, `KeyedList`.
+keyed = []
+
+# The local executor and async data: `spawn`, `Task`, `use_resource`.
+async = []
+
+# Real-time deadlines: `use_debounced`, `use_throttled`.
+timers = []
+
 [dependencies]
 
 [lints.rust]
@@ -22,6 +48,72 @@ unsafe_code = "forbid"
 all = "warn"
 missing_safety_doc = "warn"
 
+# Each example, test and bench needs the features whose API it exercises. Cargo
+# skips a target whose `required-features` are not met, so
+# `cargo test --no-default-features --features store` still works: it runs
+# `tests/store.rs` and skips the rest.
+
+[[example]]
+name = "advanced"
+required-features = []
+
+[[example]]
+name = "async"
+required-features = ["async", "timers"]
+
+[[example]]
+name = "context_demo"
+required-features = ["context"]
+
+[[example]]
+name = "demo"
+required-features = []
+
+[[example]]
+name = "hooks_demo"
+required-features = []
+
+[[example]]
+name = "keyed_list"
+required-features = ["keyed"]
+
+[[example]]
+name = "ownership"
+required-features = []
+
+[[example]]
+name = "store_demo"
+required-features = ["store"]
+
+[[example]]
+name = "todo_app"
+required-features = ["store"]
+
+[[test]]
+name = "context"
+required-features = ["context"]
+
+[[test]]
+name = "hooks"
+required-features = ["async", "keyed"]
+
+[[test]]
+name = "ownership"
+required-features = ["keyed"]
+
+[[test]]
+name = "reactivity"
+required-features = []
+
+[[test]]
+name = "scheduler"
+required-features = ["async", "timers"]
+
+[[test]]
+name = "store"
+required-features = ["store"]
+
 [[bench]]
 name = "rok_ui_hooks_bench"
 harness = false
+required-features = ["store"]

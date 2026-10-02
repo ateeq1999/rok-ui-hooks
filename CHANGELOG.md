@@ -6,6 +6,44 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-02
+
+### Added
+
+- **Feature flags.** Five optional features, all on by default, so a plain
+  `rok-ui-hooks = "0.3"` still gets the whole surface:
+
+  | feature | brings |
+  |---------|--------|
+  | `store` | `create_store`, `Store`, `use_store` |
+  | `context` | `create_context`, `use_context`, `with_provider` |
+  | `keyed` | `create_keyed_list`, `KeyedList` |
+  | `async` | `spawn`, `Task`, `use_resource` |
+  | `timers` | `use_debounced`, `use_throttled` |
+
+  `full` is an alias for all five and is what `default` points at.
+  `default-features = false` plus an explicit list is supported, and CI checks
+  all 32 subsets with `-D warnings`.
+- `required-features` on every example, test and bench target, so
+  `cargo test --no-default-features --features store` runs the tests it can and
+  skips the rest instead of failing to compile.
+
+### Changed
+
+- `tick()` compiles down to `flush()` when `timers` and `async` are both off —
+  there is then no deadline to fire and no task to poll. The symbol is unchanged,
+  so a feature-gated loop needs no conditional around the call.
+- The provider machinery in `context.rs` (the stack, `ProviderFrame`, capture and
+  restore) stays compiled when `context` is off. `runtime.rs` re-installs a
+  captured stack on every run of every node and that is not feature-dependent,
+  so the feature removes the public API rather than the plumbing.
+
+### Fixed
+
+- `README.md` described `hooks_demo` as demonstrating debounce and throttle. It
+  does not; the debounce/throttle examples live in `async` and are exercised by
+  `tests/scheduler.rs`.
+
 ## [0.2.0] - 2026-10-02
 
 ### Added

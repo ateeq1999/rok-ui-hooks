@@ -151,6 +151,10 @@ impl<T: 'static> WriteSignal<T> {
         std::mem::replace(&mut *self.cell.value.borrow_mut(), value)
     }
 
+    /// The node behind this handle, so a store can notify its subscribers.
+    /// Only [`crate::Store`] does that, so it rides the `store` feature; a new
+    /// caller must widen this `cfg`.
+    #[cfg(feature = "store")]
     pub(crate) fn node(&self) -> &Rc<Node> {
         &self.node
     }

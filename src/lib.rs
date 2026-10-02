@@ -72,6 +72,46 @@
 //! | `(count,)`  | re-run only when `count` has a new value (React `[count]`)      |
 //! | `(0i32,)`   | constant: mount only (React `[]`)                               |
 //!
+//! # Features
+//!
+//! Everything above is core and always compiled: signals, memos, effects, deps,
+//! ownership, [`batch`], [`untrack`], [`flush`], [`use_reducer`],
+//! [`use_previous`] and [`OwnedRoot`]. The rest sits behind five features —
+//! **all of which are on by default**, so a plain dependency gets the whole
+//! surface and nothing changes for an existing user.
+//!
+//! | feature    | brings                                          | lives in              |
+//! |------------|-------------------------------------------------|-----------------------|
+//! | `store`    | [`create_store`], [`Store`], [`use_store`]     | `store.rs`            |
+//! | `context`  | [`create_context`], [`use_context`], [`with_provider`] | `context.rs`   |
+//! | `keyed`    | [`create_keyed_list`], [`KeyedList`]            | `keyed.rs`            |
+//! | `async`    | [`spawn`], [`Task`], [`use_resource`]           | `executor.rs`, `resource.rs` |
+//! | `timers`   | [`use_debounced`], [`use_throttled`]            | `timer.rs`, part of `hooks.rs` |
+//!
+//! Turn the default set off and ask for what you actually use:
+//!
+//! ```toml
+//! [dependencies]
+//! rok-ui-hooks = { version = "0.3", default-features = false, features = ["store", "async"] }
+//! ```
+//!
+//! `full` is an alias for all five, so `default = ["full"]` and
+//! `features = ["full"]` mean the same thing.
+//!
+//! Three consequences worth knowing before you trim:
+//!
+//! * [`tick`] compiles down to [`flush`] when `timers` and `async` are both off,
+//!   because there is then no deadline and no task to advance. It still exists,
+//!   so your loop does not need a conditional.
+//! * The provider machinery in `context.rs` stays compiled even with `context`
+//!   off. `runtime.rs` re-installs a captured provider stack on every run of
+//!   every node and that is not feature-dependent, so the feature removes the
+//!   public API, not the plumbing.
+//! * The `docs/*.md` files, the README and every example assume the default
+//!   features, because between them they cover the whole surface. Targets in
+//!   `Cargo.toml` declare `required-features`, so `cargo test
+//!   --no-default-features` skips them instead of failing.
+//!
 //! # Where to look next
 //!
 //! * `README.md` and `docs/getting-started.md` — the guided tour.
@@ -90,14 +130,19 @@
 mod context;
 mod deps;
 mod effect;
+#[cfg(feature = "async")]
 mod executor;
 mod hooks;
+#[cfg(feature = "keyed")]
 mod keyed;
 mod memo;
+#[cfg(feature = "async")]
 mod resource;
 mod runtime;
 mod signal;
+#[cfg(feature = "store")]
 mod store;
+#[cfg(feature = "timers")]
 mod timer;
 
 /// Compiles the code blocks in `README.md` as doctests. `cfg(doctest)` is set
@@ -126,20 +171,24 @@ mod markdown_doctests {
     pub struct Porting;
 }
 
+#[cfg(feature = "context")]
 pub use context::{Context, create_context, use_context, with_provider};
 pub use deps::{DepItem, Deps};
 pub use effect::{
     Effect, create_deferred_effect, create_effect, create_render_effect, use_cleanup, use_effect,
     use_effect_with, use_ref,
 };
+#[cfg(feature = "async")]
 pub use executor::{Task, pending_tasks, spawn};
-pub use hooks::{
-    Debounced, Dispatch, OwnedRoot, Throttled, create_owned_root, use_debounced, use_previous,
-    use_reducer, use_throttled,
-};
+#[cfg(feature = "timers")]
+pub use hooks::{Debounced, Throttled, use_debounced, use_throttled};
+pub use hooks::{Dispatch, OwnedRoot, create_owned_root, use_previous, use_reducer};
+#[cfg(feature = "keyed")]
 pub use keyed::{KeyedList, create_keyed_list};
 pub use memo::{Memo, create_memo, shallow_array_eq, shallow_vec_eq, use_memo, use_memo_eq};
+#[cfg(feature = "async")]
 pub use resource::{Resource, ResourceState, use_resource, use_resource_with};
 pub use runtime::{Root, batch, create_root, flush, on_cleanup, tick, untrack};
 pub use signal::{ReadSignal, WriteSignal, create_signal, use_state};
+#[cfg(feature = "store")]
 pub use store::{Store, Subscription, create_store, use_store};

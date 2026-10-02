@@ -93,6 +93,45 @@ root.run(|| {
 - **Keyed lists** — `create_keyed_list`, which keeps per-key state across
   reorders and disposes rows exactly once.
 
+## Features
+
+Everything above — signals, memos, effects, deps, ownership, `batch`, `untrack`,
+`flush`, `use_reducer`, `use_previous`, `OwnedRoot` — is core and always
+compiled. The rest sits behind five features, **all on by default**, so a plain
+dependency already gets the whole surface:
+
+| feature | brings | lives in |
+|---------|--------|----------|
+| `store` | `create_store`, `Store`, `use_store` | `store.rs` |
+| `context` | `create_context`, `use_context`, `with_provider` | `context.rs` |
+| `keyed` | `create_keyed_list`, `KeyedList` | `keyed.rs` |
+| `async` | `spawn`, `Task`, `use_resource` | `executor.rs`, `resource.rs` |
+| `timers` | `use_debounced`, `use_throttled` | `timer.rs`, part of `hooks.rs` |
+
+Ask for only what you use:
+
+```toml
+[dependencies]
+rok-ui-hooks = { version = "0.3", default-features = false, features = ["store", "async"] }
+```
+
+`full` is an alias for all five, so `default = ["full"]` and `features = ["full"]`
+mean the same thing.
+
+Three things to know before you trim:
+
+- `tick()` compiles down to `flush()` when `timers` and `async` are both off —
+  there is then no deadline and no task to advance. It still exists, so your
+  loop needs no conditional.
+- The provider machinery in `context.rs` stays compiled with `context` off:
+  `runtime.rs` re-installs a captured provider stack on every run of every node,
+  which is not feature-dependent. The feature removes the public API, not the
+  plumbing.
+- Examples, tests and the bench declare `required-features`, so
+  `cargo test --no-default-features --features store` runs `tests/store.rs` and
+  skips the rest instead of failing. The README and `docs/*.md` assume the
+  default features, because between them they cover everything.
+
 ## Run the examples
 
 ```text
@@ -103,7 +142,7 @@ cargo run --example ownership     # who disposes what
 cargo run --example keyed_list    # reconcile by identity, not position
 cargo run --example async         # resources, futures, timers, the tick loop
 cargo run --example context_demo  # provider propagation
-cargo run --example hooks_demo    # reducer, previous, debounce, throttle
+cargo run --example hooks_demo    # reducer, previous, and scope ownership
 cargo run --example store_demo    # stores and selectors
 ```
 

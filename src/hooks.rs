@@ -2,12 +2,18 @@
 //! `use_debounced`, `use_throttled`, and the owned-scope primitive.
 
 use std::rc::Rc;
+
+#[cfg(feature = "timers")]
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "timers")]
+use crate::effect::Effect;
+#[cfg(feature = "timers")]
+use crate::effect::use_effect;
 use crate::effect::use_ref;
-use crate::effect::{Effect, use_effect};
 use crate::memo::{Memo, use_memo};
 use crate::signal::{ReadSignal, WriteSignal, use_state};
+#[cfg(feature = "timers")]
 use crate::timer::{self, Timer};
 
 type Reducer<S, A> = dyn Fn(&S, A) -> S;
@@ -110,17 +116,20 @@ pub fn use_previous<T: Clone + PartialEq + 'static>(source: &ReadSignal<T>) -> M
 ///
 /// The value lands on the next [`crate::tick`] after the deadline, so a UI loop
 /// should call `tick()` once per frame.
+#[cfg(feature = "timers")]
 pub struct Debounced<T> {
     read: ReadSignal<T>,
     _effect: Effect,
 }
 
+#[cfg(feature = "timers")]
 impl<T> std::fmt::Debug for Debounced<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Debounced").finish()
     }
 }
 
+#[cfg(feature = "timers")]
 impl<T: Clone + 'static> Debounced<T> {
     /// The settled value.
     pub fn get(&self) -> T {
@@ -139,6 +148,7 @@ impl<T: Clone + 'static> Debounced<T> {
 }
 
 /// `useDebounced(source, quiet)` — the trailing edge of a burst of writes.
+#[cfg(feature = "timers")]
 pub fn use_debounced<T: Clone + 'static>(source: &ReadSignal<T>, quiet: Duration) -> Debounced<T> {
     let (out, set_out) = use_state(source.get_untracked());
     let pending = use_ref(None::<T>);
@@ -186,17 +196,20 @@ pub fn use_debounced<T: Clone + 'static>(source: &ReadSignal<T>, quiet: Duration
 
 /// A signal that reports at most once per window: the first change goes through
 /// immediately, the rest are coalesced into one trailing update.
+#[cfg(feature = "timers")]
 pub struct Throttled<T> {
     read: ReadSignal<T>,
     _effect: Effect,
 }
 
+#[cfg(feature = "timers")]
 impl<T> std::fmt::Debug for Throttled<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Throttled").finish()
     }
 }
 
+#[cfg(feature = "timers")]
 impl<T: Clone + 'static> Throttled<T> {
     /// The current throttled value.
     pub fn get(&self) -> T {
@@ -215,6 +228,7 @@ impl<T: Clone + 'static> Throttled<T> {
 }
 
 /// `useThrottled(source, window)` — leading edge plus one trailing update.
+#[cfg(feature = "timers")]
 pub fn use_throttled<T: Clone + 'static>(source: &ReadSignal<T>, window: Duration) -> Throttled<T> {
     let (out, set_out) = use_state(source.get_untracked());
     let emitted_at = use_ref(None::<Instant>);

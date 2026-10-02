@@ -52,12 +52,50 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+  features:
+    name: features
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Every subset of the optional features
+        # Dead code only shows up in the combination that gates its last caller,
+        # so a single `--all-features` check would never see it. This walks all
+        # 32 subsets of store, context, keyed, async and timers.
+        run: |
+          features=(store context keyed async timers)
+          failed=0
+          for mask in $(seq 0 31); do
+            sel=""
+            for i in 0 1 2 3 4; do
+              if [ $(( (mask >> i) & 1 )) -eq 1 ]; then sel="$sel,${features[$i]}"; fi
+            done
+            sel="${sel#,}"
+            label="${sel:-<none>}"
+            echo "== $label"
+            if ! cargo check --quiet --no-default-features \
+                 ${sel:+--features "$sel"} --lib; then
+              echo "::error::feature subset failed: $label"
+              failed=1
+            fi
+          done
+          exit $failed
+      - name: No-default build
+        run: cargo build --all-targets --no-default-features
+      - name: One feature runs the tests it can
+        run: cargo test --no-default-features --features store
+
   docs:
     name: docs build clean
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo doc --no-deps
         env:

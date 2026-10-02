@@ -3,7 +3,7 @@
 Where this crate is going, and what it deliberately is not doing yet. Everything
 here is a decision about *not* writing code until there is a reason.
 
-## 0.2.x — hardening
+## 0.2.x — hardening (still open)
 
 - `#[deny(missing_docs)]` once the public surface stops moving.
 - `Send + Sync` on the read-only halves (`ReadSignal`, `Memo`) so state can cross
@@ -12,16 +12,19 @@ here is a decision about *not* writing code until there is a reason.
   disposals converges to the same value as a sequential reference.
 - A `loom` model of the subscription bookkeeping.
 
-## 0.3 — a real scheduler
+## 0.3 — feature flags and a public clock
 
-Today `tick()` is the only clock, which is right for a frame loop and wrong for a
-terminal program. Planned:
+Shipped the feature flags (0.3.0): `store`, `context`, `keyed`, `async`,
+`timers`, all on by default. Still to come in this line:
 
 - An optional background driver that wakes the thread owning the graph when a
   deadline passes or a future becomes ready.
-- `tick(Duration)` and a `Scheduler` that owns the queue, so `rok-ui-hooks` can drive
-  a blocking program without the caller writing a loop.
+- `tick(Duration)` and a `Scheduler` that owns the queue, so `rok-ui-hooks` can
+  drive a blocking program without the caller writing a loop.
 - Timer precision that does not depend on the caller polling.
+- A public `schedule_at` / `Timer`, which `timers` currently keeps private. The
+  query, form and table layers planned for sibling crates all need a deadline
+  they can own.
 
 Design constraint: the driver may *notify*, but the graph must still be mutated
 on the thread that owns it. The `Rc`/`RefCell` core stays.

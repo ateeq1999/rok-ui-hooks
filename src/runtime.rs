@@ -285,6 +285,9 @@ impl Node {
 
     /// Dispose everything this node owns and unlink its sources, without
     /// disposing the node itself. Used to re-run a render in the same scope.
+    /// Only [`crate::create_keyed_list`] does that, so it rides the `keyed`
+    /// feature; a new caller must widen this `cfg`.
+    #[cfg(feature = "keyed")]
     pub(crate) fn reset(&self) {
         self.tear_down_links();
     }
@@ -691,8 +694,13 @@ pub fn flush() {
 /// This is the single call a UI loop needs per frame. Outside a UI the runtime
 /// already reacts to writes, so call it only when you use timers, async
 /// resources or deferred effects.
+///
+/// The timer and executor steps are compiled out when the `timers` and `async`
+/// features are off, so `tick()` is then just [`flush()`].
 pub fn tick() {
+    #[cfg(feature = "timers")]
     crate::timer::drain();
+    #[cfg(feature = "async")]
     crate::executor::run_ready();
     flush();
 }

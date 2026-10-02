@@ -9,36 +9,53 @@
 //! A computation captures the providers that are visible where it is created and
 //! re-installs them on every run, so `use_context` resolves by *creation site*,
 //! not by whatever happens to be in scope when the effect re-runs.
+//!
+//! The `context` feature removes the public API below. The provider machinery
+//! itself — the stack, [`ProviderFrame`], capture and restore — stays compiled
+//! either way, because `runtime.rs` re-installs a captured stack on every run of
+//! every node and that has no feature-dependent shape.
 
 use std::any::Any;
-use std::cell::{Cell, RefCell};
+#[cfg(feature = "context")]
+use std::cell::Cell;
+use std::cell::RefCell;
 use std::rc::Rc;
 
+#[cfg(feature = "context")]
 use crate::signal::{ReadSignal, WriteSignal, create_signal};
 
 pub(crate) type ContextId = u64;
 
 thread_local! {
+    #[cfg(feature = "context")]
     static NEXT_CONTEXT_ID: Cell<ContextId> = const { Cell::new(0) };
     static PROVIDER_STACK: RefCell<Vec<ProviderFrame>> = const { RefCell::new(Vec::new()) };
 }
 
 /// One active provider: which context it serves, and the cell holding its value.
 /// The cell is a `(ReadSignal<T>, WriteSignal<T>)` pair, type-erased here.
+///
+/// Without the `context` feature nothing ever pushes a frame, so the payload is
+/// written and read by no one — the stack still exists because `runtime.rs`
+/// captures and restores it on every node.
+#[cfg_attr(not(feature = "context"), allow(dead_code))]
 #[derive(Clone)]
 pub(crate) struct ProviderFrame {
     pub(crate) context_id: ContextId,
     pub(crate) cell: Rc<dyn Any>,
 }
 
+#[cfg(feature = "context")]
 type Cell2<T> = (ReadSignal<T>, WriteSignal<T>);
 
 /// A typed context, comparable to React's `createContext(defaultValue)`.
+#[cfg(feature = "context")]
 pub struct Context<T> {
     id: ContextId,
     default: Cell2<T>,
 }
 
+#[cfg(feature = "context")]
 impl<T> Clone for Context<T> {
     fn clone(&self) -> Self {
         Self {
@@ -49,6 +66,7 @@ impl<T> Clone for Context<T> {
 }
 
 /// `createContext(defaultValue)`.
+#[cfg(feature = "context")]
 pub fn create_context<T: 'static>(default: T) -> Context<T> {
     let id = NEXT_CONTEXT_ID.with(|n| {
         let id = n.get();
@@ -61,6 +79,7 @@ pub fn create_context<T: 'static>(default: T) -> Context<T> {
     }
 }
 
+#[cfg(feature = "context")]
 impl<T: 'static> Context<T> {
     /// Method form of [`with_provider`].
     pub fn provide<R>(&self, value: T, f: impl FnOnce() -> R) -> R {
@@ -68,6 +87,7 @@ impl<T: 'static> Context<T> {
     }
 }
 
+#[cfg(feature = "context")]
 impl<T: Clone + 'static> Context<T> {
     /// Tracked read of the nearest provider's value, or the default.
     pub fn get(&self) -> T {
@@ -84,6 +104,7 @@ impl<T: Clone + 'static> Context<T> {
     }
 }
 
+#[cfg(feature = "context")]
 impl<T: std::fmt::Debug> std::fmt::Debug for Context<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Context").field("id", &self.id).finish()
@@ -91,6 +112,7 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Context<T> {
 }
 
 /// `<Ctx.Provider value={value}>` — push a value for the dynamic extent of `f`.
+#[cfg(feature = "context")]
 pub fn with_provider<T: 'static, R>(ctx: &Context<T>, value: T, f: impl FnOnce() -> R) -> R {
     struct PopGuard;
     impl Drop for PopGuard {
@@ -112,6 +134,7 @@ pub fn with_provider<T: 'static, R>(ctx: &Context<T>, value: T, f: impl FnOnce()
 }
 
 /// `useContext(ctx)` — tracked read of the nearest provider value.
+#[cfg(feature = "context")]
 pub fn use_context<T: Clone + 'static>(ctx: &Context<T>) -> T {
     match resolve(ctx.id) {
         Some((read, _write)) => read.get(),
@@ -120,6 +143,7 @@ pub fn use_context<T: Clone + 'static>(ctx: &Context<T>) -> T {
 }
 
 /// Nearest provider cell for `id`, innermost first.
+#[cfg(feature = "context")]
 fn resolve<T: 'static>(id: ContextId) -> Option<Cell2<T>> {
     PROVIDER_STACK.with(|s| {
         s.borrow()

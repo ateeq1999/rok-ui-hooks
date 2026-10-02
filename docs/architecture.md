@@ -20,6 +20,47 @@ in `thread_local!` state; there is no global lock and no `Send` anywhere.
 | `store.rs` | stores, selectors, subscriptions |
 | `deps.rs` | what a `deps` argument may be |
 
+## Feature flags
+
+Five optional features gate the public API; all are on by default, so a plain
+dependency gets everything and the core is unaffected either way.
+
+| feature | gates | shape of the gate |
+|---------|-------|-------------------|
+| `store` | `store.rs` | whole module |
+| `keyed` | `keyed.rs` | whole module |
+| `async` | `executor.rs`, `resource.rs` | whole module |
+| `context` | `context.rs` | public items only — see below |
+| `timers` | `timer.rs`, and `Debounced`/`Throttled` in `hooks.rs` | whole module + four items |
+
+Three couplings make this more than a mechanical `#[cfg]` sweep, and each one is
+a trap for whoever changes the graph next:
+
+- **`context` is not self-contained.** `runtime.rs` stores a captured provider
+  stack on every `Node` and re-installs it in `with_running`, so the stack, the
+  `ProviderFrame` and the capture/restore pair stay compiled even when the
+  feature is off — only `Context`, `create_context`, `with_provider`,
+  `use_context` and `resolve` disappear. Making this a feature-gated module
+  would mean either stubbing the plumbing in `Node` or paying a branch on the
+  hot path.
+- **`Node::reset` rides `keyed`.** Its only caller is
+  `KeyedList::render_entry`, which re-renders a row in the same scope.
+- **`WriteSignal::node` rides `store`.** Its only caller is `Store::set`, which
+  notifies its own listeners.
+
+Both of those carry a comment saying so. A new caller gets a compile error at
+the call site rather than a mysterious dead-code warning in the other direction,
+which is why they are `#[cfg]` rather than `#[allow(dead_code)]`.
+
+`tick()` is the one function whose *behaviour* changes rather than its body
+shrinking: without `timers` and `async` there is no deadline to fire and no task
+to poll, so it reduces to `flush()`. The symbol stays, because a caller with a
+feature-gated loop should not need a conditional to keep calling it.
+
+CI checks all 32 feature subsets with `-D warnings`, so a dead-code or
+unused-import regression in any combination fails the build rather than waiting
+for a user to hit it.
+
 ## Nodes
 
 Everything computable is a `Node`:
