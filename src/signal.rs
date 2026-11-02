@@ -1,41 +1,56 @@
 //! Signals — the state primitive, exposed as `use_state` / `create_signal`.
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::runtime::{Node, notify};
+use crate::runtime::{Id, Node, notify};
+use crate::shared::{Handle, Slot};
 
 /// The stored value. Kept apart from the [`Node`] so handles stay typed: the
 /// graph is type-erased, the data is not.
-pub(crate) struct ValueCell<T> {
-    pub(crate) value: RefCell<T>,
-}
-
-impl<T> ValueCell<T> {
-    pub(crate) fn new(value: T) -> Self {
-        ValueCell {
-            value: RefCell::new(value),
-        }
-    }
-}
+pub(crate) type ValueCell<T> = Slot<T>;
 
 /// The read half of a signal — you cannot write through it.
+///
+/// With the `thread-safe` feature this is the half that may cross a thread
+/// boundary: `ReadSignal<T>` is `Send + Sync` whenever `T` is. A read on a thread
+/// that does not own the graph is untracked, because there is no graph there to
+/// subscribe to — the value it returns is still current, since every write goes
+/// through the owning thread.
 pub struct ReadSignal<T> {
+    /// Kept as a strong reference by default: a tracked read needs the node, and
+    /// a refcount bump is cheaper than a registry lookup. Under `thread-safe`
+    /// the read half must not hold an `Rc`, so it addresses the node by id.
+    #[cfg(not(feature = "thread-safe"))]
     node: Rc<Node>,
-    cell: Rc<ValueCell<T>>,
+    #[cfg(feature = "thread-safe")]
+    id: Id,
+    cell: Handle<ValueCell<T>>,
 }
 
 /// The write half of a signal — you cannot read a tracked value through it.
+///
+/// Always `!Send`, with or without `thread-safe`: writes belong to the thread
+/// that owns the graph.
 pub struct WriteSignal<T> {
     node: Rc<Node>,
-    cell: Rc<ValueCell<T>>,
+    cell: Handle<ValueCell<T>>,
 }
 
 impl<T> Clone for ReadSignal<T> {
     fn clone(&self) -> Self {
-        Self {
-            node: self.node.clone(),
-            cell: self.cell.clone(),
+        #[cfg(not(feature = "thread-safe"))]
+        {
+            Self {
+                node: self.node.clone(),
+                cell: self.cell.clone(),
+            }
+        }
+        #[cfg(feature = "thread-safe")]
+        {
+            Self {
+                id: self.id,
+                cell: self.cell.clone(),
+            }
         }
     }
 }
@@ -49,11 +64,29 @@ impl<T> Clone for WriteSignal<T> {
     }
 }
 
+/// The node behind a read half, or `None` on a thread that does not own it.
+impl<T> ReadSignal<T> {
+    fn node(&self) -> Option<Rc<Node>> {
+        #[cfg(not(feature = "thread-safe"))]
+        {
+            Some(self.node.clone())
+        }
+        #[cfg(feature = "thread-safe")]
+        {
+            crate::runtime::lookup(self.id)
+        }
+    }
+}
+
 impl<T: std::fmt::Debug> std::fmt::Debug for ReadSignal<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[cfg(not(feature = "thread-safe"))]
+        let id = self.node.id;
+        #[cfg(feature = "thread-safe")]
+        let id = self.id;
         f.debug_struct("ReadSignal")
-            .field("id", &self.node.id)
-            .field("value", &*self.cell.value.borrow())
+            .field("id", &id)
+            .field("value", &self.cell.debug())
             .finish()
     }
 }
@@ -69,14 +102,24 @@ impl<T> std::fmt::Debug for WriteSignal<T> {
 /// `createSignal(v)` → `(read, write)`.
 pub fn create_signal<T: 'static>(initial: T) -> (ReadSignal<T>, WriteSignal<T>) {
     let node = Node::create(false);
-    let cell = Rc::new(ValueCell::new(initial));
-    (
-        ReadSignal {
-            node: node.clone(),
-            cell: cell.clone(),
-        },
-        WriteSignal { node, cell },
-    )
+    let cell: Handle<ValueCell<T>> = Handle::new(Slot::new(initial));
+    let read = {
+        #[cfg(not(feature = "thread-safe"))]
+        {
+            ReadSignal {
+                node: node.clone(),
+                cell: cell.clone(),
+            }
+        }
+        #[cfg(feature = "thread-safe")]
+        {
+            ReadSignal {
+                id: node.id,
+                cell: cell.clone(),
+            }
+        }
+    };
+    (read, WriteSignal { node, cell })
 }
 
 /// `useState(initial)` → `(state, set_state)`.
@@ -98,8 +141,10 @@ pub fn use_state<T: 'static>(initial: T) -> (ReadSignal<T>, WriteSignal<T>) {
 impl<T: 'static> ReadSignal<T> {
     /// Tracked read by reference (no clone needed).
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        Node::track(&self.node);
-        f(&self.cell.value.borrow())
+        if let Some(node) = self.node() {
+            Node::track(&node);
+        }
+        self.cell.with(f)
     }
 
     /// Tracked read that clones the value.
@@ -112,7 +157,7 @@ impl<T: 'static> ReadSignal<T> {
 
     /// Read without subscribing the current observer.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        f(&self.cell.value.borrow())
+        self.cell.with(f)
     }
 
     /// Read without subscribing the current observer.
@@ -130,6 +175,19 @@ impl<T: 'static> ReadSignal<T> {
     {
         self.get_untracked()
     }
+
+    /// The id of the node behind this handle. Equal ids mean the same signal,
+    /// which is what a debug view or a test needs.
+    pub fn id(&self) -> u64 {
+        #[cfg(not(feature = "thread-safe"))]
+        {
+            self.node.id
+        }
+        #[cfg(feature = "thread-safe")]
+        {
+            self.id
+        }
+    }
 }
 
 impl<T: 'static> WriteSignal<T> {
@@ -142,13 +200,13 @@ impl<T: 'static> WriteSignal<T> {
 
     /// Mutate in place (handy for `Vec` / `HashMap` signals).
     pub fn update(&self, f: impl FnOnce(&mut T)) {
-        f(&mut *self.cell.value.borrow_mut());
+        self.cell.with_mut(f);
         notify(&self.node);
     }
 
     /// Write the value without notifying, returning the previous one.
     pub(crate) fn replace(&self, value: T) -> T {
-        std::mem::replace(&mut *self.cell.value.borrow_mut(), value)
+        self.cell.replace(value)
     }
 
     /// The node behind this handle, so a store can notify its subscribers.

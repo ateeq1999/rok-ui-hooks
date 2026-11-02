@@ -37,12 +37,22 @@ async = []
 # Real-time deadlines: `use_debounced`, `use_throttled`.
 timers = []
 
+# `Send + Sync` on the read halves. **Off by default**: it swaps the value cell
+# for a `RwLock` and the handle for an `Arc`, so every read takes a lock. Turn it
+# on when another thread has to *read* state this thread owns.
+thread-safe = []
+
 [dependencies]
+# Only under `--cfg loom`, so a normal build of this crate has no dependencies at
+# all. `tests/loom_model.rs` needs it to explore the subscription bookkeeping.
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
 
 [lints.rust]
 missing_docs = "warn"
 missing_debug_implementations = "warn"
 unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }
 
 [lints.clippy]
 all = "warn"

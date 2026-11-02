@@ -37,9 +37,7 @@ use std::rc::{Rc, Weak};
 use crate::context::{ProviderFrame, capture_providers, with_captured_providers};
 use crate::deps::DepsAny;
 
-/// Identity of a node. Ids are handed out in creation order, which is also the
-/// order effects and memos are flushed in.
-pub(crate) type Id = u64;
+pub(crate) use crate::registry::{Id, Registry};
 
 /// How many times one node may run inside a single flush before we call the
 /// graph cyclic. Real graphs never come close; a ping-pong between two effects
@@ -58,14 +56,22 @@ thread_local! {
     /// Ownership stack: computations created here are disposed with it.
     static OWNER_STACK: RefCell<Vec<Id>> = const { RefCell::new(Vec::new()) };
     /// Every live node, weakly held so owners can address nodes by id.
-    static REGISTRY: RefCell<BTreeMap<Id, Weak<Node>>> = const { RefCell::new(BTreeMap::new()) };
+    static REGISTRY: Registry<Weak<Node>> = Registry::new();
     static NEXT_ID: Cell<Id> = const { Cell::new(0) };
     /// Effects waiting for the end of the batch.
     static PENDING: RefCell<Queue> = const { RefCell::new(BTreeMap::new()) };
     /// Effects waiting for an explicit [`flush`].
     static DEFERRED: RefCell<Queue> = const { RefCell::new(BTreeMap::new()) };
     /// Runs per node within one flush, to spot cycles.
-    static RUNS: RefCell<BTreeMap<Id, u32>> = const { RefCell::new(BTreeMap::new()) };
+    static RUNS: Registry<u32> = Registry::new();
+    /// Nodes a handle can no longer keep alive itself.
+    ///
+    /// Only used by the `thread-safe` feature. There a `Memo` holds no `Rc` —
+    /// it could not, and still be `Send + Sync` — so the node needs a strong
+    /// reference from somewhere until the last handle to it goes away. A signal
+    /// does not need this: its write half is `!Send` anyway and holds the node.
+    #[cfg(feature = "thread-safe")]
+    static KEEPALIVE: RefCell<Vec<(Id, Rc<Node>)>> = const { RefCell::new(Vec::new()) };
     static BATCH_DEPTH: Cell<usize> = const { Cell::new(0) };
     static PROPAGATION_DEPTH: Cell<usize> = const { Cell::new(0) };
 }
@@ -79,7 +85,39 @@ fn next_id() -> Id {
 }
 
 pub(crate) fn lookup(id: Id) -> Option<Rc<Node>> {
-    REGISTRY.with(|r| r.borrow().get(&id).and_then(Weak::upgrade))
+    REGISTRY.with(|r| r.get(id))
+        .and_then(|weak| weak.upgrade())
+}
+
+/// Keep `node` alive under `thread-safe`, where no handle can hold it.
+///
+/// Called once, when a memo is created. [`release_keep_alive`] gives the
+/// reference back the moment the last handle to the value is gone, so the node
+/// dies exactly when it would have without the feature.
+#[cfg(feature = "thread-safe")]
+pub(crate) fn keep_alive(id: Id, node: &Rc<Node>) {
+    KEEPALIVE.with(|live| live.borrow_mut().push((id, node.clone())));
+}
+
+/// Drop the reference [`keep_alive`] took, if it is still there.
+///
+/// The `Rc` is moved out before the node is dropped: dropping it runs
+/// `Node::drop`, which comes back here, and doing that while the vector is
+/// borrowed would panic.
+#[cfg(feature = "thread-safe")]
+pub(crate) fn release_keep_alive(id: Id) {
+    let taken = KEEPALIVE.with(|live| {
+        let mut live = live.borrow_mut();
+        live.iter().position(|(held, _)| *held == id)
+            .map(|at| live.remove(at).1)
+    });
+    drop(taken);
+}
+
+/// How many nodes [`keep_alive`] is holding, for diagnostics and tests.
+#[cfg(feature = "thread-safe")]
+pub(crate) fn keepalive_count() -> usize {
+    KEEPALIVE.with(|live| live.borrow().len())
 }
 
 /// The computation currently running, if any.
@@ -175,7 +213,7 @@ pub(crate) struct Node {
     sources: RefCell<Vec<Rc<Node>>>,
     source_versions: RefCell<Vec<u64>>,
     /// What reads this node, keyed by id so unsubscribing is exact.
-    subs: RefCell<BTreeMap<Id, Weak<Node>>>,
+    subs: Registry<Weak<Node>>,
     /// `on_cleanup` callbacks.
     pub(crate) cleanups: RefCell<Vec<Box<dyn FnOnce()>>>,
     /// Computations created while this node was running. Held **strongly**, so
@@ -230,7 +268,7 @@ impl Node {
             body: RefCell::new(None),
             sources: RefCell::new(Vec::new()),
             source_versions: RefCell::new(Vec::new()),
-            subs: RefCell::new(BTreeMap::new()),
+            subs: Registry::new(),
             cleanups: RefCell::new(Vec::new()),
             children: RefCell::new(Vec::new()),
             deps: RefCell::new(None),
@@ -240,9 +278,7 @@ impl Node {
             running: Cell::new(false),
             disposed: Cell::new(false),
         });
-        REGISTRY.with(|r| {
-            r.borrow_mut().insert(id, Rc::downgrade(&node));
-        });
+        REGISTRY.with(|r| r.insert(id, Rc::downgrade(&node)));
         if let Some(owner) = current_owner() {
             adopt(owner, &node);
         }
@@ -307,7 +343,7 @@ impl Node {
         let sources = std::mem::take(&mut *self.sources.borrow_mut());
         self.source_versions.borrow_mut().clear();
         for source in sources {
-            source.subs.borrow_mut().remove(&self.id);
+            source.subs.remove(self.id);
         }
     }
 
@@ -322,11 +358,13 @@ impl Node {
         self.state.set(State::Clean);
         self.body.borrow_mut().take();
         self.compute.borrow_mut().take();
+        #[cfg(feature = "thread-safe")]
+        release_keep_alive(self.id);
         if let Some(owner) = self.owner.get() {
             release(owner, self.id);
         }
         REGISTRY.with(|r| {
-            r.borrow_mut().remove(&self.id);
+            r.remove(self.id);
         });
     }
 
@@ -359,9 +397,7 @@ impl Node {
             .source_versions
             .borrow_mut()
             .push(node.version.get());
-        node.subs
-            .borrow_mut()
-            .insert(running.id, Rc::downgrade(&running));
+        node.subs.insert(running.id, Rc::downgrade(&running));
     }
 
     /// The declared-deps gate, evaluated untracked so that comparing deps never
@@ -408,10 +444,7 @@ fn mark_downstream(node: &Rc<Node>) {
     let _guard = PropagationGuard::enter();
     let subs: Vec<Rc<Node>> = node
         .subs
-        .borrow()
-        .values()
-        .filter_map(Weak::upgrade)
-        .collect();
+        .with(|subs| subs.values().filter_map(Weak::upgrade).collect());
     for sub in subs {
         if sub.is_disposed() || sub.running.get() {
             continue;
@@ -575,14 +608,9 @@ fn pop_next(deferred: bool) -> Option<(Id, Weak<Node>)> {
 }
 
 fn count_run(id: Id) {
-    let overflow = RUNS.with(|r| {
-        let mut runs = r.borrow_mut();
-        let count = runs.entry(id).or_insert(0);
-        *count += 1;
-        *count > MAX_EFFECT_RUNS
-    });
+    let count = RUNS.with(|r| r.bump(id));
     assert!(
-        !overflow,
+        count <= MAX_EFFECT_RUNS,
         "effect loop detected: an effect keeps writing to what it reads \
          (one node ran {MAX_EFFECT_RUNS} times in a single flush)"
     );
@@ -598,20 +626,23 @@ pub(crate) fn run_updates<R>(f: impl FnOnce() -> R) -> R {
     // writes made *by* effects are queued, never run re-entrantly. Oldest first,
     // so a memo is refreshed before the effects that read it.
     if BATCH_DEPTH.with(|d| d.get()) == 1 {
-        drain(false);
+        let _ = drain(false);
     }
     result
 }
 
-fn drain(deferred: bool) {
-    RUNS.with(|r| r.borrow_mut().clear());
+fn drain(deferred: bool) -> usize {
+    RUNS.with(|r| r.clear());
+    let mut ran = 0;
     while let Some((id, weak)) = pop_next(deferred) {
         if let Some(node) = weak.upgrade() {
             count_run(id);
             update_if_necessary(&node);
+            ran += 1;
         }
     }
-    RUNS.with(|r| r.borrow_mut().clear());
+    RUNS.with(|r| r.clear());
+    ran
 }
 
 /// Run `f` without subscribing the current observer to anything it reads.
@@ -680,12 +711,20 @@ pub fn batch<R>(f: impl FnOnce() -> R) -> R {
 /// flush();      // now it runs
 /// ```
 pub fn flush() {
+    let _ = flush_count();
+}
+
+/// [`flush`], with the number of effects that ran. Used by
+/// [`crate::Scheduler`] to tell an idle frame from a busy one.
+pub(crate) fn flush_count() -> usize {
+    let mut ran = 0;
     run_updates(|| {
         while queue_len(false) > 0 || queue_len(true) > 0 {
-            drain(false);
-            drain(true);
+            ran += drain(false);
+            ran += drain(true);
         }
     });
+    ran
 }
 
 /// Advance the world by one frame: fire due timers, poll woken tasks, then run
@@ -697,12 +736,22 @@ pub fn flush() {
 ///
 /// The timer and executor steps are compiled out when the `timers` and `async`
 /// features are off, so `tick()` is then just [`flush()`].
+///
+/// # Not having to write the loop
+///
+/// Polling on a schedule bounds timer precision to that schedule. When that
+/// matters, [`crate::Scheduler`] runs the loop and a [`crate::Driver`] wakes it
+/// exactly on the next deadline; [`crate::tick_within`] is the in-between answer,
+/// waiting up to a budget you choose inside the call itself.
 pub fn tick() {
     #[cfg(feature = "timers")]
-    crate::timer::drain();
-    #[cfg(feature = "async")]
-    crate::executor::run_ready();
-    flush();
+    crate::scheduler::step();
+    #[cfg(not(feature = "timers"))]
+    {
+        #[cfg(feature = "async")]
+        let _ = crate::executor::run_ready();
+        flush();
+    }
 }
 
 /// A disposable scope. Computations created inside [`Root::run`] — directly or

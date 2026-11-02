@@ -174,7 +174,7 @@ pub fn use_debounced<T: Clone + 'static>(source: &ReadSignal<T>, quiet: Duration
 
                 let slot = pending.clone();
                 let sink = set_out.clone();
-                let scheduled = timer::schedule(quiet, move || {
+                let scheduled = timer::schedule_after(quiet, move || {
                     if let Some(latest) = slot.borrow_mut().take() {
                         sink.set(latest);
                     }
@@ -266,7 +266,7 @@ pub fn use_throttled<T: Clone + 'static>(source: &ReadSignal<T>, window: Duratio
                     let wait = window - elapsed.unwrap_or_default();
                     let sink = set_out.clone();
                     let stamp = emitted_at.clone();
-                    let scheduled = timer::schedule(wait, move || {
+                    let scheduled = timer::schedule_after(wait, move || {
                         stamp.borrow_mut().replace(Instant::now());
                         sink.set(value);
                     });

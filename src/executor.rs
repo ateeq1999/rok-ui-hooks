@@ -13,6 +13,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::task::{Context, Wake, Waker};
+use std::time::Instant;
 
 type BoxFuture = Pin<Box<dyn Future<Output = ()>>>;
 
@@ -63,6 +64,11 @@ fn enqueue(id: u64) {
     });
     if !queued {
         READY.with(|r| r.borrow_mut().push_back(id));
+        // A task that just became ready is work the owner thread has to do, so a
+        // driver waiting on `next_wakeup` must be told now rather than at the next
+        // deadline.
+        #[cfg(feature = "timers")]
+        crate::scheduler::deadline_changed();
     }
 }
 
@@ -159,9 +165,11 @@ pub fn spawn<F: Future<Output = ()> + 'static>(future: F) -> Task {
 /// error: the task keeps its place in the queue and resumes on the next tick.
 const MAX_POLLS_PER_TICK: u32 = 100;
 
-/// Poll every ready task until none is left. Called by [`crate::tick`].
-pub(crate) fn run_ready() {
+/// Poll every ready task until none is left. Called by [`crate::tick`]. Returns
+/// how many polls happened.
+pub(crate) fn run_ready() -> usize {
     let mut polls: BTreeMap<u64, u32> = BTreeMap::new();
+    let mut ran = 0;
     while let Some(id) = READY.with(|r| r.borrow_mut().pop_front()) {
         let count = polls.entry(id).or_insert(0);
         *count += 1;
@@ -172,7 +180,16 @@ pub(crate) fn run_ready() {
             break;
         }
         poll(id);
+        ran += 1;
     }
+    ran
+}
+
+/// `Some(now)` when a task is ready to poll, so a loop knows it has work even
+/// though no deadline is involved.
+pub(crate) fn next_ready() -> Option<Instant> {
+    let ready = READY.with(|r| r.borrow().is_empty());
+    (!ready).then(Instant::now)
 }
 
 fn poll(id: u64) {

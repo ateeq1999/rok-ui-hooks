@@ -138,7 +138,11 @@ mod keyed;
 mod memo;
 #[cfg(feature = "async")]
 mod resource;
+mod registry;
 mod runtime;
+#[cfg(feature = "timers")]
+mod scheduler;
+mod shared;
 mod signal;
 #[cfg(feature = "store")]
 mod store;
@@ -189,6 +193,12 @@ pub use memo::{Memo, create_memo, shallow_array_eq, shallow_vec_eq, use_memo, us
 #[cfg(feature = "async")]
 pub use resource::{Resource, ResourceState, use_resource, use_resource_with};
 pub use runtime::{Root, batch, create_root, flush, on_cleanup, tick, untrack};
+#[cfg(feature = "timers")]
+pub use scheduler::{Driver, Scheduler, Tick, next_wakeup, tick_within};
 pub use signal::{ReadSignal, WriteSignal, create_signal, use_state};
 #[cfg(feature = "store")]
 pub use store::{Store, Subscription, create_store, use_store};
+#[cfg(feature = "timers")]
+pub use timer::{
+    Timer, next_deadline, pending_timers, schedule_after, schedule_at,
+};
